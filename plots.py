@@ -203,12 +203,19 @@ def day4_bonds():
     ax2 = fig.add_axes([0.58, 0.14, 0.38, 0.68])
     cfs = bond_cash_flows(0.05, 100.0, maturities)
     pvs = np.array([cf * discount_factor(CURVE[m], m) for m, cf in zip(maturities, cfs)])
-    bars = ax2.bar([f"{m}y" for m in maturities], pvs, color=BLUE, width=0.62)
-    for b, v in zip(bars, pvs):
-        ax2.text(b.get_x() + b.get_width() / 2, v + 1.8, f"{v:.2f}", ha="center", fontsize=10.5, color=BLUE, fontweight="bold")
-    ax2.set_ylim(0, 100)
-    ax2.set_ylabel("Present value of each payment")
-    panel_title(ax2, f"Each payment discounted at its own z: total {pvs.sum():.2f}")
+    x = np.arange(len(maturities))
+    bars = ax2.bar(x, pvs, color=BLUE, width=0.62, label="Worth today (discounted)")
+    ax2.bar(x, cfs - pvs, bottom=pvs, color=LGRAY, width=0.62, label="Lost to discounting")
+    for xi, cf, v in zip(x, cfs, pvs):
+        ax2.text(xi, cf + 2, f"{v:.2f}", ha="center", fontsize=10.5, color=BLUE, fontweight="bold")
+    ax2.set_xticks(x)
+    ax2.set_xticklabels([f"{m}y\npays {cf:.0f}" for m, cf in zip(maturities, cfs)], fontsize=10.5)
+    ax2.set_ylim(0, 122)
+    ax2.set_ylabel("Value of each payment")
+    ax2.legend(frameon=False, loc="upper left", fontsize=10.5)
+    ax2.text(0.02, 0.60, f"Paid: {cfs.sum():.2f}\nWorth today: {pvs.sum():.2f}", transform=ax2.transAxes,
+             fontsize=12, color=GRAY, va="top", linespacing=1.5)
+    panel_title(ax2, "Each payment discounted at its own z")
     return save(fig, "day4_bond_as_zero_coupon_bonds.png")
 
 
