@@ -28,7 +28,7 @@ checked against, Shreve the reason it works.
 | Black-Scholes-Merton model: hedge, equation, risk-neutral valuation, formula, four routes to one price | `bsm_equation.py`, `pde.py`, `riskneutral.py` | `charts/day6_black_scholes_pde.png`, `charts/day6b_pde_numerics.png` | 15.6, 15.7, 15.8, 21.8 |
 | N(d1) and N(d2) | `bsm.py`, `riskneutral.py` | `charts/day7_n_d1_n_d2.png` | 15.8, 19.4, ch. 28 |
 | The Greek letters | `greeks.py` | `charts/day8_greeks_1.png` to `_3.png` (three slides, also `charts/day8_greeks_carousel.pdf`), `charts/day8_greeks.png` | 19.4 to 19.9, Table 19.6 |
-| Delta hedging | `hedging.py` | `charts/day9_delta_hedging.png` | 19.4, Tables 19.2 to 19.4 |
+| Delta hedging | `hedging.py` | `charts/day9_delta_hedging.png`, `charts/day9b_hedging_detail.png` | 19.4, Tables 19.2 to 19.4 |
 | Volatility smiles | `impliedvol.py`, `smile.py` | `charts/day10_volatility_smile.png` | ch. 20 and appendix |
 
 ### What each module does, how it is checked, where it stops

@@ -12,7 +12,7 @@ from bs_reference import bs_price
 from bsm import bsm_price, d1_d2, norm_cdf
 from bsm_equation import hedged_change, one_step_moves, portfolio_value
 from greeks import all_greeks, delta, gamma, theta, vega
-from hedging import gbm_paths, hedge_cost, hedging_pnl
+from hedging import gbm_paths, hedge_cost, hedge_deltas, hedging_pnl
 from impliedvol import implied_vol, implied_vols
 from pde import pde_gamma, pde_grid_solution, pde_price
 from riskneutral import call_price_control_variate, mean_and_se, terminal_prices
@@ -112,7 +112,7 @@ def day6_map():
             ax.annotate("", xy=(0.05, y0 - gap + 0.003), xytext=(0.05, y0 - 0.003),
                         arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=2.2, mutation_scale=16))
 
-    # right: Hull figure 15.2, the call price against the stock price and its slope
+    # right: the call price against the stock price and its slope
     fx = fig.add_axes([0.725, 0.17, 0.245, 0.53])
     spots = np.linspace(60, 140, 161)
     price = bsm_price(spots, K, R, SIG, T)
@@ -138,7 +138,7 @@ def day6_map():
 def day6b_pde_numerics():
     fig = landscape(
         6,
-        "Solving the equation on a grid (Hull 21.8)",
+        "Solving the equation on a grid",
         "Call, S0 = K = 100, r = 5%, vol = 20%, T = 1y. Finite differences, grid denser near the strike.",
     )
     exact = bs_price(S0, K, R, SIG, T, "call")
@@ -434,14 +434,17 @@ def _chunked(fn, n_paths, chunk=25_000):
     return np.concatenate(out)
 
 
-def day9_delta_hedging():
+day9_numbers = {}
+
+
+def day9b_hedging_detail():
     fig = landscape(
         9,
         "Delta hedging is a bet on realised volatility",
-        "Short call sold at 20% vol and hedged at 20%. Left: S0 = K = 100, 1y, drift r. Right: Hull 19.1 example.",
+        "Short call sold at 20% vol and delta hedged at 20%. S0 = K = 100, r = 5%, 1 year, drift r.",
     )
 
-    ax = panel(fig, 0.095, 0.38)
+    ax = panel(fig, 0.095, 0.38, bottom=0.225, height=0.52)
     vols = np.array([0.10, 0.15, 0.20, 0.25, 0.30, 0.35])
     grid = np.linspace(0.08, 0.37, 120)
     c_imp = float(bsm_price(S0, K, R, SIG, T))
@@ -462,31 +465,85 @@ def day9_delta_hedging():
     ax.set_ylabel("Hedger P&L per option")
     ax.legend(frameon=False, loc="upper right", fontsize=11.5)
     ax.set_ylim(-9.5, 7.5)
-    title(ax, "Expected P&L (bars: 1 std)")
+    title(ax, "Hedger P&L by realised volatility (bars: 1 std)")
 
-    s0, k, r, sig, t, mu = 49.0, 50.0, 0.05, 0.20, 20 / 52, 0.13
-    price = float(bsm_price(s0, k, r, sig, t, "call"))
-    ax2 = panel(fig, 0.585, 0.38)
-    sizes = np.array([4, 5, 10, 20, 40, 80, 160, 320])
+    price = float(bsm_price(S0, K, R, SIG, T, "call"))
+    ax2 = panel(fig, 0.585, 0.38, bottom=0.225, height=0.52)
+    sizes = np.array([4, 8, 12, 26, 52, 104, 252])
     ours = []
     for n in sizes:
-        cost = _chunked(lambda m, i: np.exp(-r * t) * hedge_cost(gbm_paths(s0, mu, sig, t, int(n), m, seed=7000 + i), k, r, sig, t),
+        cost = _chunked(lambda m, i: np.exp(-R * T) * hedge_cost(gbm_paths(S0, R, SIG, T, int(n), m, seed=7000 + i), K, R, SIG, T),
                         200_000)
         ours.append(cost.std(ddof=1) / price)
     ours = np.array(ours)
-    ax2.loglog(sizes, ours, "o-", color=BLUE, lw=2.8, ms=8.5, label=f"This code (slope {_slope(sizes[3:], ours[3:]):.2f})")
+    day9_numbers.update({int(n): float(v) for n, v in zip(sizes, ours)})
+    ax2.loglog(sizes, ours, "o-", color=BLUE, lw=2.8, ms=8.5, label=f"simulated (slope {_slope(sizes[2:], ours[2:]):.2f})")
     ax2.loglog(sizes, ours[2] * np.sqrt(sizes[2] / sizes), "--", color=GRAY, lw=1.8, label="1 / sqrt(N)")
-    ax2.loglog([4, 5, 10, 20, 40, 80], [0.42, 0.38, 0.28, 0.21, 0.16, 0.13], "s", color=ORANGE, ms=9.5, mfc="white",
-               mew=2.4, ls="none", label="Hull Table 19.4")
-    ax2.set_xticks([4, 10, 40, 160, 320])
-    ax2.set_xticklabels(["4", "10", "40", "160", "320"])
+    ax2.set_xticks([4, 12, 52, 252])
+    ax2.set_xticklabels(["4", "12\nmonthly", "52\nweekly", "252\ndaily"])
     ax2.minorticks_off()
     ax2.set_yticks([0.05, 0.1, 0.2, 0.4])
     ax2.set_yticklabels(["0.05", "0.1", "0.2", "0.4"])
-    ax2.set_xlabel("N rebalancings over 20 weeks")
-    ax2.set_ylabel("Std of cost / option price")
+    ax2.set_xlabel("N rebalancings over 1 year")
+    ax2.set_ylabel("Std of hedging cost / premium")
     ax2.legend(frameon=False, loc="lower left", fontsize=11.5)
-    title(ax2, "Hedging error: 1 / sqrt(N)")
+    title(ax2, "Hedging error shrinks like 1 / sqrt(N)")
+    return save_portrait(fig, "day9b_hedging_detail.png")
+
+
+def day9_delta_hedging():
+    fig = landscape(
+        9,
+        "Delta hedging is a bet on realised volatility",
+        "Short call sold at 20% vol and delta hedged. S0 = K = 100, r = 5%, 1 year.",
+    )
+    c_imp = float(bsm_price(S0, K, R, SIG, T))
+
+    ax = panel(fig, 0.095, 0.40, bottom=0.225, height=0.52)
+    grid = np.linspace(0.08, 0.37, 200)
+    pnl = np.array([c_imp - float(bsm_price(S0, K, R, v, T)) for v in grid])
+    ax.fill_between(grid * 100, pnl, 0, where=pnl >= 0, color=BLUE, alpha=0.18, lw=0)
+    ax.fill_between(grid * 100, pnl, 0, where=pnl <= 0, color=ORANGE, alpha=0.20, lw=0)
+    ax.plot(grid * 100, pnl, color=BLUE, lw=3.2)
+    ax.axhline(0, color=GRAY, lw=1.0)
+    ax.axvline(SIG * 100, color=INK, lw=1.2, ls=":")
+    for v, dx, dy, ha in ((0.15, 0.6, 0.55, "left"), (0.20, 0.7, 0.55, "left"), (0.30, -0.7, -1.15, "right")):
+        val = c_imp - float(bsm_price(S0, K, R, v, T))
+        ax.plot([v * 100], [val], "o", color=BLUE, ms=10, mec="white", mew=1.6, zorder=5)
+        txt = "0.00" if abs(val) < 1e-9 else f"{val:+.2f}"
+        ax.text(v * 100 + dx, val + dy, f"{int(round(v * 100))}%: {txt}", fontsize=14, fontweight="bold", color=INK, ha=ha)
+    ax.text(9, -1.1, "stock realises less:\nthe hedger wins", fontsize=12.5, color=BLUE, va="top")
+    ax.text(36.5, 4.9, "stock realises more:\nthe hedger loses", fontsize=12.5, color="#b35f00", va="top", ha="right")
+    ax.set_xlim(8, 37)
+    ax.set_ylim(-7, 5.5)
+    ax.set_xlabel("Volatility the stock actually realises, %")
+    ax.set_ylabel("P&L per option sold")
+    title(ax, "Sold at 20%: the hedger's expected P&L")
+
+    # right: one path, hedged every week. The hedge is the number of shares held against the call sold.
+    n = 52
+    path = gbm_paths(S0, R, SIG, T, n, 1, seed=0)
+    wk = np.arange(n + 1)
+    delta_hold = hedge_deltas(path, K, R, SIG, T)[0]
+    ax2 = panel(fig, 0.615, 0.35, bottom=0.465, height=0.285)
+    ax2.plot(wk, path[0], color=INK, lw=2.4)
+    ax2.axhline(K, color=GRAY, lw=1.2, ls=":")
+    ax2.text(51.5, K - 1.6, "K = 100", fontsize=12, color=GRAY, ha="right", va="top")
+    ax2.set_xlim(0, n)
+    ax2.set_ylim(82, 130)
+    ax2.set_yticks([90, 110, 130])
+    ax2.set_xticklabels([])
+    ax2.set_ylabel("Stock price")
+    title(ax2, "One path, hedged every week")
+    ax3 = panel(fig, 0.615, 0.35, bottom=0.225, height=0.19)
+    ax3.step(wk, delta_hold, where="post", color=BLUE, lw=2.8)
+    ax3.fill_between(wk, delta_hold, step="post", color=BLUE, alpha=0.16, lw=0)
+    ax3.set_xlim(0, n)
+    ax3.set_ylim(0, 1.08)
+    ax3.set_yticks([0, 0.5, 1])
+    ax3.set_xlabel("Week")
+    ax3.set_ylabel("Shares held")
+    ax3.text(27, 0.93, "stock up: buy shares, stock down: sell", fontsize=12.5, color=BLUE, ha="center", va="center")
     return save_portrait(fig, "day9_delta_hedging.png")
 
 
@@ -536,5 +593,5 @@ def day10_smile():
 
 
 if __name__ == "__main__":
-    for make in (day6_map, day6b_pde_numerics, day7_n_d1_d2, day8_greeks, day8_carousel, day9_delta_hedging, day10_smile):
+    for make in (day6_map, day6b_pde_numerics, day7_n_d1_d2, day8_greeks, day8_carousel, day9_delta_hedging, day9b_hedging_detail, day10_smile):
         print(make())
