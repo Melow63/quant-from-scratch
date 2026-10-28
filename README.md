@@ -29,7 +29,7 @@ checked against, Shreve the reason it works.
 | N(d1) and N(d2) | `bsm.py`, `riskneutral.py` | `charts/day7_n_d1_n_d2.png` | 15.8, 19.4, ch. 28 |
 | The Greek letters | `greeks.py` | `charts/day8_greeks_1.png` to `_3.png` (three slides, also `charts/day8_greeks_carousel.pdf`), `charts/day8_greeks.png` | 19.4 to 19.9, Table 19.6 |
 | Delta hedging | `hedging.py` | `charts/day9_delta_hedging.png`, `charts/day9b_hedging_detail.png` | 19.4, Tables 19.2 to 19.4 |
-| Volatility smiles | `impliedvol.py`, `smile.py` | `charts/day10_volatility_smile.png` | ch. 20 and appendix |
+| Volatility smiles | `impliedvol.py`, `smile.py` | `charts/day10_volatility_smile.png`, `charts/day10b_smile_density.png` | ch. 20 and appendix |
 
 ### What each module does, how it is checked, where it stops
 

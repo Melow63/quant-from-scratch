@@ -548,7 +548,7 @@ def day9_delta_hedging():
 
 
 # ------------------------------------------------------------------ Day 10
-def day10_smile():
+def day10b_smile_density():
     s0, r, t = 100.0, 0.03, 0.5
     jump = dict(sigma=0.15, lam=0.5, mu_j=-0.15, sigma_j=0.15)  # Merton jump-diffusion, synthetic
     fig = landscape(
@@ -589,9 +589,109 @@ def day10_smile():
     ax2.text(0.97, 0.95, f"P(S_T < 80): {100 * p_true:.1f}% from the smile,\n{100 * p_flat:.1f}% with a flat vol",
              transform=ax2.transAxes, ha="right", va="top", fontsize=12, color=GRAY)
     title(ax2, "The density behind it: a heavy left tail")
+    return save_portrait(fig, "day10b_smile_density.png")
+
+
+def day10c_smile_tail():
+    s0, r, t = 100.0, 0.03, 0.5
+    jump = dict(sigma=0.15, lam=0.5, mu_j=-0.15, sigma_j=0.15)  # Merton jump-diffusion, synthetic
+    fig = landscape(
+        10,
+        "The smile is a probability distribution in disguise",
+        "Implied vol: the vol that makes Black-Scholes match a price. Synthetic prices, S0 = 100, r = 3%, 6 months.",
+    )
+    strikes = np.arange(40.0, 220.01, 0.5)
+    calls = merton_call(s0, strikes, r, T=t, **jump)
+    vols = implied_vols(calls, s0, strikes, r, t)
+    atm = float(implied_vol(float(merton_call(s0, 100.0, r, T=t, **jump)), s0, 100.0, r, t))
+
+    ax = panel(fig, 0.095, 0.40, bottom=0.225, height=0.52)
+    w = (strikes >= 70) & (strikes <= 130)
+    ax.plot(strikes[w], 100 * vols[w], color=BLUE, lw=3.4)
+    ax.axhline(100 * atm, color=ORANGE, lw=2.6, ls="--")
+    ax.axvline(s0, color=LGRAY, lw=1.3, ls=":")
+    ax.text(129, 100 * atm + 0.35, f"Black-Scholes: flat {100 * atm:.1f}%", fontsize=12.5, color="#b35f00", ha="right",
+            va="bottom")
+    ax.text(129, 26.2, "market: one vol\nper strike", fontsize=13, color=BLUE, va="top", ha="right")
+    ax.set_xlabel("Strike K")
+    ax.set_ylabel("Implied vol, %")
+    ax.set_ylim(17, 28.8)
+    title(ax, "What the market prices")
+
+    ax2 = panel(fig, 0.615, 0.35, bottom=0.225, height=0.52)
+    p_true = 1.0 - float(merton_exercise_probability(80.0, s0, r, T=t, **jump))
+    p_flat = 1.0 - float(norm_cdf(d1_d2(s0, 80.0, r, atm, t)[1]))
+    xs = np.arange(2)
+    ax2.bar(xs, [100 * p_flat, 100 * p_true], width=0.55, color=[ORANGE, BLUE])
+    for x, v in zip(xs, [p_flat, p_true]):
+        ax2.text(x, 100 * v + 0.22, f"{100 * v:.1f}%", ha="center", fontsize=16, fontweight="bold", color=INK)
+    ax2.set_xticks(xs)
+    ax2.set_xticklabels(["Flat vol\n(Black-Scholes)", "Read from\nthe smile"])
+    ax2.set_ylim(0, 9.2)
+    ax2.set_yticks([])
+    ax2.spines["left"].set_visible(False)
+    ax2.set_xlim(-0.6, 1.6)
+    ax2.text(1.55, 8.9, f"{p_true / p_flat:.1f} times more likely", fontsize=12.5, color=GRAY, ha="right", va="top")
+    title(ax2, "Chance the stock ends below 80")
+    return save_portrait(fig, "day10c_smile_tail.png")
+
+
+def day10_smile():
+    s0, r = 100.0, 0.03
+    jump = dict(sigma=0.15, lam=0.5, mu_j=-0.15, sigma_j=0.15)  # Merton jump-diffusion, synthetic
+    fig = landscape(
+        10,
+        "The volatility surface: one implied vol per strike and maturity",
+        "Implied vol: the vol that makes Black-Scholes match a price. Synthetic prices (jump-diffusion), S0 = 100, r = 3%.",
+    )
+    fine = np.arange(40.0, 220.01, 0.25)
+    strikes = np.arange(75.0, 120.01, 1.0)
+    maturities = np.linspace(0.08, 1.0, 40)
+    surf = np.zeros((len(maturities), len(strikes)))
+    for i, t in enumerate(maturities):
+        v = implied_vols(merton_call(s0, fine, r, T=t, **jump), s0, fine, r, t)
+        surf[i] = 100 * np.interp(strikes, fine, v)
+
+    # left: the surface in 3D
+    ax = fig.add_axes([0.0, 0.13, 0.56, 0.74], projection="3d")
+    kk, tt = np.meshgrid(strikes, maturities)
+    from matplotlib.colors import LinearSegmentedColormap
+    cmap = LinearSegmentedColormap.from_list("vol", ["#8fb8e6", "#2f78c4", "#0f3a6b"])
+    ax.plot_surface(kk, tt, surf, cmap=cmap, vmin=17, vmax=42, edgecolor="none",
+                    antialiased=True, rstride=1, cstride=1, shade=False)
+    ax.plot_wireframe(kk, tt, surf, color="white", linewidth=0.25, rstride=3, cstride=3, alpha=0.8)
+    ax.view_init(elev=24, azim=-58)
+    ax.set_xlabel("Strike K", labelpad=8, fontsize=13)
+    ax.set_ylabel("Maturity, years", labelpad=10, fontsize=13)
+    ax.set_zlabel("Implied vol, %", labelpad=6, fontsize=13)
+    ax.set_zlim(15, 42)
+    ax.tick_params(labelsize=11)
+    for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+        axis.pane.set_facecolor((1, 1, 1, 0))
+        axis.pane.set_edgecolor("#d9d9d9")
+        axis._axinfo["grid"]["color"] = "#e5e5e5"
+
+    # right: smile at four maturities
+    ax2 = panel(fig, 0.625, 0.345, bottom=0.225, height=0.52)
+    shades = {0.1: "#0f3a6b", 0.25: BLUE, 0.5: "#6fa3d9", 1.0: LBLUE}
+    names = {0.1: "1 month", 0.25: "3 months", 0.5: "6 months", 1.0: "1 year"}
+    w = (fine >= 75) & (fine <= 120)
+    for t in (0.1, 0.25, 0.5, 1.0):
+        v = implied_vols(merton_call(s0, fine, r, T=t, **jump), s0, fine, r, t)
+        ax2.plot(fine[w], 100 * v[w], color=shades[t], lw=3.0, label=names[t])
+    ax2.legend(loc="upper right", frameon=False, fontsize=12, handlelength=1.6)
+    ax2.set_xlim(75, 120)
+    ax2.set_ylim(9, 42)
+    ax2.axvline(s0, color=ORANGE, lw=1.8, ls="--")
+    ax2.text(75.8, 12.4, "OTM put\nITM call", fontsize=12, color=INK, va="center")
+    ax2.text(100.0, 12.4, "ATM", fontsize=12, color=ORANGE, va="center", ha="center", bbox=dict(fc="white", ec="none", pad=1.5))
+    ax2.text(119.2, 12.4, "OTM call\nITM put", fontsize=12, color=INK, va="center", ha="right")
+    ax2.set_xlabel("Strike K")
+    ax2.set_ylabel("Implied vol, %")
+    title(ax2, "Same surface, sliced by maturity")
     return save_portrait(fig, "day10_volatility_smile.png")
 
 
 if __name__ == "__main__":
-    for make in (day6_map, day6b_pde_numerics, day7_n_d1_d2, day8_greeks, day8_carousel, day9_delta_hedging, day9b_hedging_detail, day10_smile):
+    for make in (day6_map, day6b_pde_numerics, day7_n_d1_d2, day8_greeks, day8_carousel, day9_delta_hedging, day9b_hedging_detail, day10_smile, day10b_smile_density, day10c_smile_tail):
         print(make())
