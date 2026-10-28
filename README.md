@@ -90,6 +90,21 @@ Checked: Hull Example 20A.1 to four decimals; density against the exact density 
 checked against simulation. It is not market data. Limits: real option chains are noisy and a second derivative amplifies
 noise, so a real smile has to be fitted or smoothed before the density is read from it. That is not done here.
 
+## Week 3
+
+| Topic | Code | Chart | Hull |
+|-------|------|-------|------|
+| Monte Carlo: price, standard error, paths needed | `montecarlo.py`, `riskneutral.py` | `charts/day11_monte_carlo.png` | 21.6, 21.7 |
+
+**`montecarlo.py`** prices a call as the discounted mean of the payoff over simulated terminal prices and reports the
+standard error `sd / sqrt(N)`. For a call under Black-Scholes-Merton `sd` has a closed form (`call_payoff_std_exact`), so the number
+of paths for a given precision can be computed without simulating (`paths_needed`) and then checked against a run. For the
+at-the-money call S0 = K = 100, r = 5%, vol 20%, 1 year, a 95% interval of one cent takes about 8.3 million plain paths,
+4.2 million with antithetic draws and 1.2 million with the stock as control variate (Hull 21.7).
+Checked: `sd` against a 2 million path simulation to 0.5%; the standard error halves when the paths are multiplied by 4;
+every method within 4 standard errors of the closed form; the half-width of a run at the predicted N. See `tests/test_montecarlo.py`.
+Limits: European payoff, constant volatility, one asset. Path-dependent payoffs and American options are not covered.
+
 ## Run
 
 ```bash
@@ -98,6 +113,7 @@ pip install -r requirements-dev.txt      # adds scipy and QuantLib, used only by
 pytest                                   # validation tests are skipped if scipy or QuantLib is missing
 python plots.py                          # week 1 charts
 python plots_week2.py                    # week 2 charts
+python plots_week3.py                    # week 3 charts
 ```
 
 ## Notes
